@@ -203,8 +203,8 @@ void SL_Open(SL_Id_e id)
 
     sl_vars[id].cnt = 0;
 
-    int is_active = sl_is_active(id);
-    int reverse = SL_OpenCustomInit(id, is_active);
+    uint8_t is_active = sl_is_active(id);
+    uint8_t reverse = SL_OpenCustomInit(id);
 
     if (is_active)
     {
@@ -253,9 +253,8 @@ __weak void SL_TriggerExecute(SL_Id_e id)
     (void)id;
 }
 
-__weak int SL_OpenCustomInit(SL_Id_e id, int is_active)
+__weak uint8_t SL_OpenCustomInit(SL_Id_e id)
 {
     (void)id;
-    (void)is_active;
     return 0;
 }

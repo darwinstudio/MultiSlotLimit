@@ -116,7 +116,7 @@ void SL_TriggerExecute(SL_Id_e id) {
 对于需要反转逻辑的限位（如半圆形挡片），覆盖 `SL_OpenCustomInit`：
 
 ```c
-int SL_OpenCustomInit(SL_Id_e id, int is_active) {
+uint8_t SL_OpenCustomInit(SL_Id_e id) {
     if (id == LIMIT_ID_MICRO_UP_DOWN) {
         return 1;  // 反转：先找 idle 边沿，保证停止位置一致
     }
@@ -134,4 +134,4 @@ int SL_OpenCustomInit(SL_Id_e id, int is_active) {
 | `SL_GetStatus(id)` | 去抖读取（5ms 延时） |
 | `SL_GetStateNoDelay(id)` | 原始 GPIO 读取 |
 | `SL_TriggerExecute(id)` | `__weak` 触发回调 |
-| `SL_OpenCustomInit(id, is_active)` | `__weak` 初始化自定义 |
+| `SL_OpenCustomInit(id)` | `__weak` 初始化自定义 |

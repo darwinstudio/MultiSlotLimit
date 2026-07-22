@@ -99,9 +99,8 @@ void SL_TriggerExecute(SL_Id_e id);
  * 宿主项目可强覆盖此函数，为特定限位反转初始化逻辑。
  *
  * @param id 限位ID
- * @param is_active 当前是否处于触发电平 (1=yes, 0=no)
  * @return 1=使用反转逻辑(先找idle边沿), 0=使用默认逻辑
  */
-int SL_OpenCustomInit(SL_Id_e id, int is_active);
+uint8_t SL_OpenCustomInit(SL_Id_e id);
 
 #endif
