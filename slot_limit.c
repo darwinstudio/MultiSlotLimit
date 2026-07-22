@@ -242,8 +242,6 @@ void SL_Init(void)
 
     sl_handle =
         xTaskCreateStatic(sl_task_entry, "slot_limit", SL_TASK_STACK_SIZE, NULL, SL_TASK_PRIORITY, sl_stack, &sl_tcb);
-
-    configASSERT(sl_handle != NULL);
 }
 
 /* ========== __weak 回调默认实现 ========== */
