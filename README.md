@@ -4,11 +4,12 @@
 
 ## 特性
 
-- 基于 FreeRTOS 任务的轮询去抖检测
-- 通过配置表抽象硬件，零直接硬件引用
+- 基于**硬件定时器溢出中断（ISR）扫描** + 时间去抖检测（非任务轮询）
+- 通过配置表抽象硬件，零直接硬件引用（GPIO 经 `sl_hw_table`，定时器经 `SL_TIM_HANDLE`）
 - 静态内存分配（无 malloc）
 - `__weak` 回调，方便宿主项目处理触发事件
 - 支持自定义初始化逻辑（`SL_OpenCustomInit`）
+- 去抖采用"连续稳定时间"模型，与定时器周期解耦（`SL_TIMER_PERIOD_US` 单一真相源）
 
 ## 文件结构
 
@@ -45,10 +46,10 @@ typedef enum {
 } SL_Id_e;
 
 // 扫描定时器：CubeMX 配好 PSC，使 ARR=SL_TIMER_PERIOD_US 时溢出周期为对应微秒
-extern TIM_HandleTypeDef htim2;
+// htim2 为 CubeMX 生成的全局 TIM 句柄（宿主工程已可见，无需 extern）
 #define SL_TIM_HANDLE       htim2
 #define SL_TIMER_PERIOD_US  100   // 扫描周期(us)，同时作 ARR 值与去抖步长
-#define SL_STABLE_TIME_US   300   // 去抖稳定时间(us)
+#define SL_STABLE_TIME_US   300   // 去抖稳定时间(us)：电平连续一致累计达到此值即确认
 
 // 可选覆盖
 // #define SL_TASK_STACK_SIZE 512
@@ -58,6 +59,17 @@ extern TIM_HandleTypeDef htim2;
 ```
 
 **重要**: 确保 `slot_limit_config.h` 所在目录在 include 路径中优先于 `MultiSlotLimit/` 目录。
+
+### 运行前提（否则编译失败或定时器静默失效）
+
+1. **开启 HAL 定时器回调注册**：在宿主的 `stm32f4xx_hal_conf.h` 中
+   `#define USE_HAL_TIM_REGISTER_CALLBACKS 1`。本库通过
+   `HAL_TIM_RegisterCallback` 注册溢出回调，未开启时该宏为空，定时器不会触发扫描
+   （库已在 `slot_limit.h` 中加编译期 `#error` 检查）。
+2. **定时器中断优先级**：`SL_TIM_HANDLE` 对应的 TIM 中断优先级须 **≤ `configMAX_SYSCALL_INTERRUPT_PRIORITY`**，
+   否则 `xTaskNotifyGiveFromISR` 等 FromISR API 非法。该值在 `FreeRTOSConfig.h` 中设置。
+3. **PSC 配置**：用 CubeMX 配好 TIM 预分频，使 `ARR = SL_TIMER_PERIOD_US` 时溢出周期恰为
+   `SL_TIMER_PERIOD_US` 微秒（如 100 → 100µs）。库只设 ARR，不碰 PSC。
 
 ### 3. 定义硬件配置表
 
@@ -133,7 +145,7 @@ uint8_t SL_OpenCustomInit(SL_Id_e id) {
 
 | 函数 | 说明 |
 |------|------|
-| `SL_Init()` | 创建 FreeRTOS 任务 |
+| `SL_Init()` | 创建 FreeRTOS 触发任务，并配置/启动扫描定时器（设 ARR、注册溢出回调） |
 | `SL_Open(id)` | 开启限位检测 |
 | `SL_Close(id)` | 关闭限位检测 |
 | `SL_GetStatus(id)` | 去抖读取（5ms 延时） |
