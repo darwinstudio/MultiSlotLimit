@@ -44,8 +44,13 @@ typedef enum {
     LIMIT_ID_NUMS
 } SL_Id_e;
 
+// 扫描定时器：CubeMX 配好 PSC，使 ARR=SL_TIMER_PERIOD_US 时溢出周期为对应微秒
+extern TIM_HandleTypeDef htim2;
+#define SL_TIM_HANDLE       htim2
+#define SL_TIMER_PERIOD_US  100   // 扫描周期(us)，同时作 ARR 值与去抖步长
+#define SL_STABLE_TIME_US   300   // 去抖稳定时间(us)
+
 // 可选覆盖
-// #define SL_DEBOUNCE_COUNT  5
 // #define SL_TASK_STACK_SIZE 512
 // #define SL_TASK_PRIORITY   6
 
