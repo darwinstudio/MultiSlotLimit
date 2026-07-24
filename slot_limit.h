@@ -4,6 +4,13 @@
 #include <stdint.h>
 #include "stm32f4xx_hal.h"
 
+/* 库通过 HAL_TIM_RegisterCallback 注册定时器溢出回调，依赖 Cube HAL 的
+ * 弱回调注册机制。宿主必须在 stm32f4xx_hal_conf.h 中开启此宏，否则
+ * HAL_TIM_RegisterCallback 为空宏，定时器静默失效。 */
+#ifndef USE_HAL_TIM_REGISTER_CALLBACKS
+#error "MultiSlotLimit requires USE_HAL_TIM_REGISTER_CALLBACKS=1 in stm32f4xx_hal_conf.h (needed by HAL_TIM_RegisterCallback)"
+#endif
+
 #include "slot_limit_config.h"
 
 /* ========== 默认配置（宿主项目可在 slot_limit_config.h 中覆盖） ========== */

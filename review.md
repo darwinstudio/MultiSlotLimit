@@ -3,6 +3,44 @@
 请对我提供的整个驱动库进行一次"最终版本评审（Final Review）"。
 
 ================================
+评审前置说明（必读，否则第 2/3 项会误判）
+================================
+
+本库是一轮**有意重构**的产物，以下设计是 deliberate（不是 AI 顺手加的），
+评审第 2 项"AI 过度设计"、第 3 项"临界区专项"请基于这些前提判断，不要建议退回旧方案：
+
+1. 单硬件定时器模型：宿主用 CubeMX 配好 TIM 的 PSC，库通过
+   `SL_TIM_HANDLE` 句柄设置 ARR、注册 `HAL_TIM_PERIOD_ELAPSED_CB_ID` 回调、
+   `HAL_TIM_Base_Start_IT` 启动。ISR（SL_TimerCallback）内扫描全部限位。
+   —— 这是为"采样相位由硬件时基锁定、提升光限位重复精度"刻意采用的，非过度抽象。
+
+2. 时间去抖模型：删除旧的 `SL_DEBOUNCE_COUNT` 计次，改为 `stable`(uint16_t, µs)
+   连续累计：`stable += SL_TIMER_PERIOD_US`，不一致则清零，`>= SL_STABLE_TIME_US` 确认。
+   `SL_TIMER_PERIOD_US` 同时作 ARR 值与累加步长（单一真相源）。—— 刻意与定时器周期解耦。
+
+3. 命令位通道（sl_cmd）与 sl_trig_pending 位图：SL_Open/SL_Close 只置命令位，
+   由 ISR 消费应用；确认触发后 ISR 置 sl_trig_pending 并 xTaskNotifyGiveFromISR 唤醒任务，
+   任务上下文执行 SL_TriggerExecute。
+   —— 目的：让 sl_vars 的"写者"唯一（仅 ISR），从而彻底移除 taskENTER_CRITICAL。
+
+4. 临界区现状：本库**已无 taskENTER_CRITICAL / portENTER_CRITICAL**（符合单写者设计）。
+   第 3 项预期结论为"无临界区，合理"，不要建议重新加回。
+
+5. 真实运行前提（评审第 4 项需确认）：`HAL_TIM_RegisterCallback` 仅在宿主
+   stm32f4xx_hal_conf.h 中 `#define USE_HAL_TIM_REGISTER_CALLBACKS 1` 时生效；
+   TIM 中断优先级须 ≤ configMAX_SYSCALL_INTERRUPT_PRIORITY 才能合法调用 FromISR API。
+   请重点核查这两点是否在本库使用方式上成立（库不持有该宏，属宿主配置）。
+
+6. stable 回绕：电平持续一致时 stable 在达到 SL_STABLE_TIME_US 即清零，
+   不会一路累加到 65535 回绕；且 SL_STABLE_TIME_US 受 _Static_assert(<=65535) 约束。
+   第 1 项"整数溢出"请按"是否真可能发生"判断。
+
+================================
+评审范围（按优先级从高到低）
+================================
+
+
+================================
 核心禁令（最重要，最先读）
 ================================
 
