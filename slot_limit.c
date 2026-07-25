@@ -157,7 +157,7 @@ static void SL_TimerCallback(TIM_HandleTypeDef *htim)
                 sl_vars[id].machine = SL_MACHINE_CLOSE;
                 sl_trig_pending[id] = 1;
                 BaseType_t higher_priority_task_woken = pdFALSE;
-                xTaskNotifyGiveFromISR(sl_handle, &higher_priority_task_woken);
+                vTaskNotifyGiveFromISR(sl_handle, &higher_priority_task_woken);
                 portYIELD_FROM_ISR(higher_priority_task_woken);
             }
         }
