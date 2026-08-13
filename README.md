@@ -70,6 +70,7 @@ typedef enum {
    否则 `xTaskNotifyGiveFromISR` 等 FromISR API 非法。该值在 `FreeRTOSConfig.h` 中设置。
 3. **PSC 配置**：用 CubeMX 配好 TIM 预分频，使 `ARR = SL_TIMER_PERIOD_US` 时溢出周期恰为
    `SL_TIMER_PERIOD_US` 微秒（如 1000 → 1ms）。库只设 ARR，不碰 PSC。
+4. **编译器需支持 C11**：库使用了 `_Static_assert`。STM32CubeMX 生成工程默认 gnu11，一般无需改动。
 
 ### 3. 定义硬件配置表
 

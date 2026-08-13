@@ -36,6 +36,7 @@ MultiSlotLimit 是一个可复用的限位开关（限位开关）检测库，�
 - TIM 中断优先级必须 ≤ `configMAX_SYSCALL_INTERRUPT_PRIORITY`（否则 FromISR API 非法）。
 - CubeMX 必须配置好 TIM 预分频（PSC），使 `ARR = SL_TIMER_PERIOD_US` 时溢出周期恰为该微秒数。
   库只设置 ARR（`SL_Init` → `__HAL_TIM_SET_AUTORELOAD`），从不改动 PSC。
+- 编译器需支持 C11（库使用 `_Static_assert`）。STM32CubeMX 生成工程默认 gnu11，一般无需改动。
 
 ## 架构
 

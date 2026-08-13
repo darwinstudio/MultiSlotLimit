@@ -239,6 +239,12 @@ void SL_Init(void) {
 
     sl_handle =
         xTaskCreateStatic(sl_task_entry, "slot_limit", SL_TASK_STACK_SIZE, NULL, SL_TASK_PRIORITY, sl_stack, &sl_tcb);
+    if (sl_handle == NULL) {
+#ifdef SL_USE_EASYLOGGER
+        log_e("The limit detection task create fail!");
+#endif
+        return; /* 任务创建失败（静态内存不足），不启动定时器，避免 ISR 通知空句柄 */
+    }
 
     /* 配置并启动扫描定时器：ARR = SL_TIMER_PERIOD_US（PSC 由 CubeMX 配好） */
     __HAL_TIM_SET_AUTORELOAD(&SL_TIM_HANDLE, (uint16_t) SL_TIMER_PERIOD_US);
@@ -280,6 +286,7 @@ __weak void SL_HardStop(SL_Id_e id) {
  *
  * @param id 限位ID
  * @return 1=使用反转逻辑(先找idle边沿), 0=使用默认逻辑
+ * @note 本函数经 sl_do_open 由定时器 ISR 调用，运行在 ISR 上下文：禁止阻塞。
  */
 __weak uint8_t SL_OpenCustomInit(SL_Id_e id) {
     (void) id;

@@ -50,6 +50,8 @@
 _Static_assert(SL_TIMER_PERIOD_US <= 65535, "SL_TIMER_PERIOD_US exceeds uint16_t range");
 _Static_assert(SL_STABLE_TIME_US <= 65535, "SL_STABLE_TIME_US exceeds uint16_t range");
 _Static_assert(SL_TIMER_PERIOD_US > 0, "SL_TIMER_PERIOD_US must be > 0");
+_Static_assert(SL_STABLE_TIME_US + SL_TIMER_PERIOD_US <= 65535,
+               "SL_STABLE_TIME_US + SL_TIMER_PERIOD_US exceeds uint16_t range (stable overflow)");
 
 /**
  * @file slot_limit.h
