@@ -59,20 +59,23 @@ CLOSE → OPEN（等待 idle）→ WAIT_TRIGGER（等待 active）→ CLOSE + �
 以上字段均为单 bit 纯写 / 单写者字段，在 F407 上无需 `taskENTER_CRITICAL` 即安全。
 **切勿为这些字段引入第二个写者**，除非重新加回临界区——整个设计都建立在单写者纪律之上。
 
-**触发路径** — ISR 确认触发 → 置位 `sl_trig_pending[id]` → `vTaskNotifyGiveFromISR` →
-`sl_task_entry` 被唤醒并调用 `SL_TriggerExecute(id)`。回调运行在任务上下文，绝不在 ISR 中。
+**触发路径** — ISR 确认触发 → 立即在 ISR 中调用 `SL_HardStop(id)`（硬停，早于任务）→ 置位
+`sl_trig_pending[id]` → `vTaskNotifyGiveFromISR` → `sl_task_entry` 被唤醒并调用
+`SL_TriggerExecute(id)`。`SL_HardStop` 运行在 ISR 上下文，`SL_TriggerExecute` 运行在任务上下文。
 
 **配置抽象** — 库中零直接硬件引用。GPIO 来自 `sl_hw_table[]`（宿主定义的
 `SL_HwConfig_t`：端口/引脚/触发电平）；定时器来自 `SL_TIM_HANDLE` 宏。读取直接使用
 `port->IDR`，以保证 ISR 安全。
 
-**弱回调** — `SL_TriggerExecute` 与 `SL_OpenCustomInit` 均为 `__weak`（`slot_limit.c:260`），
-宿主无需额外配置标志即可覆盖。
+**弱回调** — `SL_HardStop`、`SL_TriggerExecute` 与 `SL_OpenCustomInit` 均为 `__weak`
+（`slot_limit.c:260`），宿主无需额外配置标志即可覆盖。
 
 ## API 说明
 
 - `SL_GetStatus(id)` 阻塞 5 ms（`vTaskDelay`）做两次采样去抖读取；若在 ISR 中调用或 id 越界
   则返回 `SL_STATE_INVALID`。需要原始 GPIO 读取时用 `SL_GetStateNoDelay(id)`。
+- `SL_HardStop(id)` 为 `__weak` 硬停回调，在 ISR 确认触发时立即调用（早于任务上下文的
+  `SL_TriggerExecute`），用于紧急停电机；运行在 ISR 上下文，禁止阻塞。
 - `SL_OpenCustomInit(id)` 返回 1 表示反转开合时的初始状态逻辑（例如半圆形挡片需要先寻找
   idle 边沿）。
 - `slot_limit.c` include 了 CubeMX 生成的 `main.h` 与 `tim.h` —— 它假定宿主项目的生成目录结构。

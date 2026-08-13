@@ -48,8 +48,8 @@ typedef enum {
 // 扫描定时器：CubeMX 配好 PSC，使 ARR=SL_TIMER_PERIOD_US 时溢出周期为对应微秒
 // htim2 为 CubeMX 生成的全局 TIM 句柄（宿主工程已可见，无需 extern）
 #define SL_TIM_HANDLE       htim2
-#define SL_TIMER_PERIOD_US  100   // 扫描周期(us)，同时作 ARR 值与去抖步长
-#define SL_STABLE_TIME_US   300   // 去抖稳定时间(us)：电平连续一致累计达到此值即确认
+#define SL_TIMER_PERIOD_US  1000  // 扫描周期(us)，同时作 ARR 值与去抖步长
+#define SL_STABLE_TIME_US   3000  // 去抖稳定时间(us)：电平连续一致累计达到此值即确认
 
 // 可选覆盖
 // #define SL_TASK_STACK_SIZE 512
@@ -69,7 +69,7 @@ typedef enum {
 2. **定时器中断优先级**：`SL_TIM_HANDLE` 对应的 TIM 中断优先级须 **≤ `configMAX_SYSCALL_INTERRUPT_PRIORITY`**，
    否则 `xTaskNotifyGiveFromISR` 等 FromISR API 非法。该值在 `FreeRTOSConfig.h` 中设置。
 3. **PSC 配置**：用 CubeMX 配好 TIM 预分频，使 `ARR = SL_TIMER_PERIOD_US` 时溢出周期恰为
-   `SL_TIMER_PERIOD_US` 微秒（如 100 → 100µs）。库只设 ARR，不碰 PSC。
+   `SL_TIMER_PERIOD_US` 微秒（如 1000 → 1ms）。库只设 ARR，不碰 PSC。
 
 ### 3. 定义硬件配置表
 
@@ -150,5 +150,6 @@ uint8_t SL_OpenCustomInit(SL_Id_e id) {
 | `SL_Close(id)` | 关闭限位检测 |
 | `SL_GetStatus(id)` | 去抖读取（5ms 延时） |
 | `SL_GetStateNoDelay(id)` | 原始 GPIO 读取 |
+| `SL_HardStop(id)` | `__weak` 硬停回调（ISR 中立即调用，停电机） |
 | `SL_TriggerExecute(id)` | `__weak` 触发回调 |
 | `SL_OpenCustomInit(id)` | `__weak` 初始化自定义 |

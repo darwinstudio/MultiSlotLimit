@@ -155,6 +155,7 @@ static void SL_TimerCallback(TIM_HandleTypeDef *htim)
             else if (sl_vars[id].machine == SL_MACHINE_WAIT_TRIGGER)
             {
                 sl_vars[id].machine = SL_MACHINE_CLOSE;
+                SL_HardStop(id); /* 硬停：ISR 上下文立即执行，早于任务回调 */
                 sl_trig_pending[id] = 1;
                 BaseType_t higher_priority_task_woken = pdFALSE;
                 vTaskNotifyGiveFromISR(sl_handle, &higher_priority_task_woken);
@@ -258,6 +259,11 @@ void SL_Init(void)
 /* ========== __weak 回调默认实现 ========== */
 
 __weak void SL_TriggerExecute(SL_Id_e id)
+{
+    (void)id;
+}
+
+__weak void SL_HardStop(SL_Id_e id)
 {
     (void)id;
 }

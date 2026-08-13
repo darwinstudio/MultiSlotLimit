@@ -45,14 +45,14 @@
 // #define SL_TIM_HANDLE  htim2
 
 /** @brief 定时器溢出周期（微秒），同时用作 ARR 值与去抖累加步长。
- *  更改扫描频率只需改此宏（ARR 与步长同步变化）。默认 100。
+ *  更改扫描频率只需改此宏（ARR 与步长同步变化）。默认 1000。
  */
-// #define SL_TIMER_PERIOD_US 100
+// #define SL_TIMER_PERIOD_US 1000
 
 /** @brief 去抖稳定时间（微秒）：连续一致的累计时间 >= 此值即确认状态切换。
- *  取代旧的"计次"SL_DEBOUNCE_COUNT，与定时器周期解耦。默认 300。
+ *  取代旧的"计次"SL_DEBOUNCE_COUNT，与定时器周期解耦。默认 3000。
  */
-// #define SL_STABLE_TIME_US  300
+// #define SL_STABLE_TIME_US  3000
 
 /* ========== 可选覆盖（默认值在 slot_limit.h 中定义） ========== */
 

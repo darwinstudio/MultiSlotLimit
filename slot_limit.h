@@ -29,13 +29,13 @@
  *   2) 去抖累加步长 stable += SL_TIMER_PERIOD_US
  * 更改扫描频率只需改这一个宏（ARR 与步长同步变化）。 */
 #ifndef SL_TIMER_PERIOD_US
-#define SL_TIMER_PERIOD_US 100
+#define SL_TIMER_PERIOD_US 1000
 #endif
 
 /* 去抖稳定时间（微秒）：某限位连续一致的累计时间 >= 此值即确认状态切换。
  * 取代旧的"计次"模型 SL_DEBOUNCE_COUNT，与定时器周期解耦。 */
 #ifndef SL_STABLE_TIME_US
-#define SL_STABLE_TIME_US 300
+#define SL_STABLE_TIME_US 3000
 #endif
 
 #ifndef SL_TASK_STACK_SIZE
@@ -128,6 +128,16 @@ SL_State_e SL_GetStateNoDelay(SL_Id_e id);
  * @param id 触发的限位ID
  */
 void SL_TriggerExecute(SL_Id_e id);
+
+/**
+ * @brief 限位硬停回调（__weak，宿主项目强覆盖以立即停止电机）
+ *
+ * 在定时器 ISR 确认触发时立即调用，早于任务上下文的 SL_TriggerExecute。
+ * 运行在 ISR 上下文：禁止阻塞，禁止调用非 FromISR 的 FreeRTOS API。
+ *
+ * @param id 触发的限位ID
+ */
+void SL_HardStop(SL_Id_e id);
 
 /**
  * @brief SL_Open 初始化状态自定义（__weak）
