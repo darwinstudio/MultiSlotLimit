@@ -91,64 +91,13 @@ extern const SL_HwConfig_t sl_hw_table[SL_COUNT];
 
 /* ========== 公共 API ========== */
 
-/**
- * @brief 初始化限位模块，创建 FreeRTOS 任务
- */
 void SL_Init(void);
-
-/**
- * @brief 开启限位检测
- * @param id 限位ID
- */
 void SL_Open(SL_Id_e id);
-
-/**
- * @brief 关闭限位检测
- * @param id 限位ID
- */
 void SL_Close(SL_Id_e id);
-
-/**
- * @brief 获取限位状态（带5ms去抖延时，任务上下文安全）
- * @param id 限位ID
- * @return SL_State_e
- * @note 本函数会 vTaskDelay(5ms)，禁止在中断中调用（会返回 SL_STATE_INVALID）。
- */
 SL_State_e SL_GetStatus(SL_Id_e id);
-
-/**
- * @brief 获取限位状态（无去抖，原始GPIO读取）
- * @param id 限位ID
- * @return SL_State_e
- */
 SL_State_e SL_GetStateNoDelay(SL_Id_e id);
-
-/**
- * @brief 限位触发回调（__weak，宿主项目强覆盖以处理触发事件）
- * @param id 触发的限位ID
- */
 void SL_TriggerExecute(SL_Id_e id);
-
-/**
- * @brief 限位硬停回调（__weak，宿主项目强覆盖以立即停止电机）
- *
- * 在定时器 ISR 确认触发时立即调用，早于任务上下文的 SL_TriggerExecute。
- * 运行在 ISR 上下文：禁止阻塞，禁止调用非 FromISR 的 FreeRTOS API。
- *
- * @param id 触发的限位ID
- */
 void SL_HardStop(SL_Id_e id);
-
-/**
- * @brief SL_Open 初始化状态自定义（__weak）
- *
- * 当限位开启时，库会读取当前GPIO电平并设置初始状态机。
- * 默认逻辑：active电平 -> WAIT_TRIGGER，idle电平 -> OPEN。
- * 宿主项目可强覆盖此函数，为特定限位反转初始化逻辑。
- *
- * @param id 限位ID
- * @return 1=使用反转逻辑(先找idle边沿), 0=使用默认逻辑
- */
 uint8_t SL_OpenCustomInit(SL_Id_e id);
 
 #endif

@@ -80,6 +80,11 @@ CLOSE → OPEN（等待 idle）→ WAIT_TRIGGER（等待 active）→ CLOSE + �
   idle 边沿）。
 - `slot_limit.c` include 了 CubeMX 生成的 `main.h` 与 `tim.h` —— 它假定宿主项目的生成目录结构。
 
+## 代码风格
+
+- 注释使用 doxygen 风格（`/** */`，`@brief`/`@param`/`@return`/`@note`）。
+- 函数注释写在 `.c` 实现文件，`.h` 头文件不写函数级注释（仅保留类型/枚举/结构体/宏/文件级注释）。
+
 ## 许可证
 
 MIT（见 `LICENSE`）。
