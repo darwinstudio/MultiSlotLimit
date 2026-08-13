@@ -14,13 +14,16 @@
  *   - sl_trig_pending 位图由 ISR 置位、任务消费。
  *   以上均为单 bit 纯写 / ISR 独占写，F407 上安全，无需 taskENTER_CRITICAL。
  */
-
 #include "slot_limit.h"
 
 #include "FreeRTOS.h"
 #include "main.h"
 #include "task.h"
 #include "tim.h"
+#ifdef SL_USE_EASYLOGGER
+#include "elog.h"
+#define LOG_TAG "slot_limit"
+#endif
 
 /** @brief 内部状态机 */
 typedef enum {
@@ -194,7 +197,9 @@ SL_State_e SL_GetStatus(SL_Id_e id) {
     if (first == second) {
         return first ? SL_STATE_TRIGGER : SL_STATE_IDLE;
     }
-
+#ifdef SL_USE_EASYLOGGER
+    log_w("The reading status of limit %d(driver) is inconsistent twice.", id);
+#endif
     /* 不一致则视为未触发 */
     return SL_STATE_IDLE;
 }
@@ -206,6 +211,9 @@ SL_State_e SL_GetStatus(SL_Id_e id) {
 void SL_Open(SL_Id_e id) {
     if (id < SL_COUNT) {
         sl_cmd[id].open = 1; /* ISR 消费并应用，不直接改 sl_vars */
+#ifdef SL_USE_EASYLOGGER
+        log_i("Limit %d(driver) has been activated for detection", id);
+#endif
     }
 }
 
@@ -216,6 +224,9 @@ void SL_Open(SL_Id_e id) {
 void SL_Close(SL_Id_e id) {
     if (id < SL_COUNT) {
         sl_cmd[id].close = 1;
+#ifdef SL_USE_EASYLOGGER
+        log_i("Limit %d(driver) has been closed for detection", id);
+#endif
     }
 }
 
@@ -233,6 +244,9 @@ void SL_Init(void) {
     __HAL_TIM_SET_AUTORELOAD(&SL_TIM_HANDLE, (uint16_t) SL_TIMER_PERIOD_US);
     HAL_TIM_RegisterCallback(&SL_TIM_HANDLE, HAL_TIM_PERIOD_ELAPSED_CB_ID, SL_TimerCallback);
     HAL_TIM_Base_Start_IT(&SL_TIM_HANDLE);
+#ifdef SL_USE_EASYLOGGER
+    log_i("The limit detection task has been initiated.");
+#endif
 }
 
 /* ========== __weak 回调默认实现 ========== */

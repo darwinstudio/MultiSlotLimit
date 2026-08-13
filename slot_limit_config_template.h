@@ -58,5 +58,6 @@
 
 // #define SL_TASK_STACK_SIZE 512  // 任务栈大小(word)，默认 512
 // #define SL_TASK_PRIORITY   6    // 任务优先级，默认 6
+// #define SL_USE_EASYLOGGER // 使用easylogger日志库打印
 
 #endif
