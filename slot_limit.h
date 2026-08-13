@@ -8,7 +8,7 @@
  * 弱回调注册机制。宿主必须在 stm32f4xx_hal_conf.h 中开启此宏，否则
  * HAL_TIM_RegisterCallback 为空宏，定时器静默失效。 */
 #ifndef USE_HAL_TIM_REGISTER_CALLBACKS
-#error                                                                         \
+#error \
     "MultiSlotLimit requires USE_HAL_TIM_REGISTER_CALLBACKS=1 in stm32f4xx_hal_conf.h (needed by HAL_TIM_RegisterCallback)"
 #endif
 
@@ -20,8 +20,7 @@
  * 溢出周期 = SL_TIMER_PERIOD_US 微秒。本库负责设置
  * ARR、注册溢出回调并启动定时器。 */
 #ifndef SL_TIM_HANDLE
-#error                                                                         \
-    "SL_TIM_HANDLE must be defined by the host project (e.g. #define SL_TIM_HANDLE htim2)"
+#error "SL_TIM_HANDLE must be defined by the host project (e.g. #define SL_TIM_HANDLE htim2)"
 #endif
 
 /* 定时器溢出周期（微秒）：同时用作
@@ -48,10 +47,8 @@
 
 /* stable / 周期 / 稳定时间均以微秒为单位，用 uint16_t 承载，上限 65535us。
  * 编译期拦截超限配置，避免静默溢出。 */
-_Static_assert(SL_TIMER_PERIOD_US <= 65535,
-               "SL_TIMER_PERIOD_US exceeds uint16_t range");
-_Static_assert(SL_STABLE_TIME_US <= 65535,
-               "SL_STABLE_TIME_US exceeds uint16_t range");
+_Static_assert(SL_TIMER_PERIOD_US <= 65535, "SL_TIMER_PERIOD_US exceeds uint16_t range");
+_Static_assert(SL_STABLE_TIME_US <= 65535, "SL_STABLE_TIME_US exceeds uint16_t range");
 _Static_assert(SL_TIMER_PERIOD_US > 0, "SL_TIMER_PERIOD_US must be > 0");
 
 /**
@@ -72,16 +69,16 @@ _Static_assert(SL_TIMER_PERIOD_US > 0, "SL_TIMER_PERIOD_US must be > 0");
 
 /** @brief 限位状态 */
 typedef enum {
-  SL_STATE_IDLE,    /**< 未触发 */
-  SL_STATE_TRIGGER, /**< 已触发 */
-  SL_STATE_INVALID  /**< 无效（ISR中调用或ID非法） */
+    SL_STATE_IDLE, /**< 未触发 */
+    SL_STATE_TRIGGER, /**< 已触发 */
+    SL_STATE_INVALID /**< 无效（ISR中调用或ID非法） */
 } SL_State_e;
 
 /** @brief 硬件配置结构体（由宿主项目在 sl_hw_table[] 中填充） */
 typedef struct {
-  GPIO_TypeDef *port; /**< GPIO端口 (GPIO_TypeDef*) */
-  uint16_t pin;       /**< GPIO引脚 */
-  uint8_t active;     /**< 触发电平 (1=HIGH, 0=LOW) */
+    GPIO_TypeDef* port; /**< GPIO端口 (GPIO_TypeDef*) */
+    uint16_t pin; /**< GPIO引脚 */
+    uint8_t active; /**< 触发电平 (1=HIGH, 0=LOW) */
 } SL_HwConfig_t;
 
 /* ========== 外部配置表（宿主项目定义） ========== */
