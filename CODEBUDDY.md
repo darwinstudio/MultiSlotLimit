@@ -2,50 +2,81 @@
 
 This file provides guidance to CodeBuddy Code when working with code in this repository.
 
-## What this repository is
+## 项目是什么
 
-A reusable, header-only-API C library for **limit switch (限位开关) detection on STM32**, built on FreeRTOS. It is intended to be consumed as a **git submodule** by a host firmware project — it is not built or tested standalone inside this repo. There is no Makefile/CMakeLists/test framework here; all build, flash, and test commands come from the host project that includes `slot_limit.c` and this directory on its include path.
+MultiSlotLimit 是一个可复用的限位开关（限位开关）检测库，面向 STM32（F4 HAL）+ FreeRTOS。
+它是一个**以 git submodule 形式嵌入宿主 STM32CubeMX 项目的头文件/源文件库**——自身没有
+构建系统、没有测试、没有 lint 配置，也无法独立编译（见下文"构建"）。
 
-## Files
+三个源文件：
 
-- `slot_limit.h` — public API + default config macros and type definitions (`SL_State_e`, `SL_HwConfig_t`). Host-supplied config: `SL_TIM_HANDLE`, `SL_TIMER_PERIOD_US`, `SL_STABLE_TIME_US`, `SL_TASK_STACK_SIZE`, `SL_TASK_PRIORITY`. Includes `slot_limit_config.h` (host-supplied) and `stm32f4xx_hal.h`.
-- `slot_limit.c` — implementation: hardware-timer ISR scan, time-based debounce state machine, FreeRTOS trigger task, `__weak` callbacks.
-- `slot_limit_config_template.h` — template the host copies to its include dir as `slot_limit_config.h` (defines `SL_COUNT`, `SL_Id_e`, timer config).
-- `README.md` — integration guide (submodule add, config file, hardware table, CMake include, API usage).
+- `slot_limit.h` — 公共 API、默认配置宏、编译期检查。
+- `slot_limit.c` — 实现（定时器 ISR、去抖状态机、FreeRTOS 任务）。
+- `slot_limit_config_template.h` — 供宿主复制为 `slot_limit_config.h` 的模板。
 
-## Architecture (the big picture)
+## 构建
 
-**Hardware abstraction via config table, zero direct hardware references.**
-The library never references specific GPIO ports/pins. The host defines two things:
-1. `slot_limit_config.h` — sets `SL_COUNT` and the `SL_Id_e` id enum (must match in size).
-2. `sl_hw_table[]` — a `const SL_HwConfig_t sl_hw_table[SL_COUNT]` array in some host `.c`, mapping each id to `{port, pin, active}` (active = 1 for HIGH-triggered, 0 for LOW-triggered). The library reads pins only through `sl_read_pin` → direct `GPIOx->IDR` read (ISR-safe, no `HAL_GPIO_ReadPin`), so the table is the sole hardware coupling.
+本仓库没有构建命令。库只能作为宿主 STM32 项目的一部分进行编译。
 
-**Timer is host-owned, library drives it.** The host defines `SL_TIM_HANDLE` (a CubeMX-generated TIM handle) and configures its prescaler (PSC) so that `ARR = SL_TIMER_PERIOD_US` yields an overflow period of `SL_TIMER_PERIOD_US` microseconds. `SL_Init()` calls `__HAL_TIM_SET_AUTORELOAD(&SL_TIM_HANDLE, SL_TIMER_PERIOD_US)`, registers `SL_TimerCallback` via `HAL_TIM_RegisterCallback(..., HAL_TIM_PERIOD_ELAPSED_CB_ID, ...)`, and starts it with `HAL_TIM_Base_Start_IT`. The library never picks the TIM instance — the handle comes entirely from host config.
+集成步骤（来自 `README.md`）：
 
-**Include-path precedence is load-bearing.** `slot_limit.h` does `#include "slot_limit_config.h"`. The host's `slot_limit_config.h` directory MUST be on the include path *ahead of* this `MultiSlotLimit/` directory, otherwise the template (not the real config) is picked up. This is the single most common integration mistake.
+1. 添加为 submodule：`git submodule add <repo_url> MultiSlotLimit`
+2. 将 `slot_limit_config_template.h` 复制到宿主项目的 include 目录，重命名为
+   `slot_limit_config.h`，并填入 `SL_COUNT`、`SL_Id_e`、`SL_TIM_HANDLE`、
+   `SL_TIMER_PERIOD_US`、`SL_STABLE_TIME_US`。该配置目录必须在 include 路径中
+   **优先于** `MultiSlotLimit/` 目录。
+3. 加入 CMake：源文件 `.../MultiSlotLimit/slot_limit.c`，include 目录 `.../MultiSlotLimit`。
+4. 在宿主的某个 `.c` 文件中定义 `const SL_HwConfig_t sl_hw_table[SL_COUNT]`。
+5. 启动时调用 `SL_Init()`；运动期间调用 `SL_Open(id)` / `SL_Close(id)`。
 
-**Hardware-timer ISR scan + FreeRTOS trigger task (no software polling).**
-- `SL_Init()` creates a **statically-allocated** task (`xTaskCreateStatic`, no malloc) with a static stack/TCB sized by `SL_TASK_STACK_SIZE`, and starts the scan timer (see above).
-- Each limit has `sl_vars[id]` = `{stable, machine}` where `machine` is one of `SL_MACHINE_CLOSE / OPEN / WAIT_TRIGGER`, and `stable` is a `uint16_t` microsecond accumulator (replaces the old `cnt` count).
-- The timer overflow ISR `SL_TimerCallback` runs every `SL_TIMER_PERIOD_US`: it scans **all** limits, consumes `SL_Open`/`SL_Close` command bits, and applies time-based debounce. The task `sl_task_entry` stays blocked on `ulTaskNotifyTake(portMAX_DELAY)` and only wakes when the ISR confirms a trigger (via `xTaskNotifyGiveFromISR`), then runs `SL_TriggerExecute(id)` for each pending id (`sl_trig_pending[]` bitmap). So CPU for limit logic is event-driven, not a 1ms busy poll.
-- **Time-based debounce (period-decoupled).** In the ISR, the expected level depends on phase (`OPEN` expects idle, `WAIT_TRIGGER` expects active). A matching level does `stable += SL_TIMER_PERIOD_US`; a mismatch resets `stable = 0`. When `stable >= SL_STABLE_TIME_US` the transition is confirmed: `OPEN` → `WAIT_TRIGGER` (idle seen, now watching for active), `WAIT_TRIGGER` → `CLOSE` + sets pending + notifies task. Because the step is `SL_TIMER_PERIOD_US` (the same macro that sets ARR), changing the scan frequency requires editing only that one macro — no recalculation of a count.
+宿主侧前置条件（缺少以下任一项，要么编译失败，要么定时器静默失效）：
 
-**Initial-state decision lives in `SL_Open`.** On open, it reads the current pin level and sets the starting phase. For normally-active limits it starts in `WAIT_TRIGGER`; for limits that need inverted logic (e.g. a half-disc flag) the host overrides the `__weak` `SL_OpenCustomInit(id)` to return 1, which flips the starting phase so the stop position stays consistent.
+- 在 `stm32f4xx_hal_conf.h` 中 `#define USE_HAL_TIM_REGISTER_CALLBACKS 1`
+  （由 `slot_limit.h:10` 的 `#error` 强制检查）。
+- TIM 中断优先级必须 ≤ `configMAX_SYSCALL_INTERRUPT_PRIORITY`（否则 FromISR API 非法）。
+- CubeMX 必须配置好 TIM 预分频（PSC），使 `ARR = SL_TIMER_PERIOD_US` 时溢出周期恰为该微秒数。
+  库只设置 ARR（`SL_Init` → `__HAL_TIM_SET_AUTORELOAD`），从不改动 PSC。
 
-**Two query paths:**
-- `SL_GetStatus(id)` — debounced: reads, `vTaskDelay(5ms)`, reads again; consistent → confirmed state. Returns `SL_STATE_INVALID` if called inside an ISR (`xPortIsInsideInterrupt`) or bad id. Must NOT be called from interrupt context.
-- `SL_GetStateNoDelay(id)` — raw GPIO read, safe everywhere, no delay.
+## 架构
 
-**`__weak` extension points** (host strong-defines to override):
-- `SL_TriggerExecute(id)` — stop the motor / handle the trip.
-- `SL_OpenCustomInit(id)` — invert open-phase logic per id.
+**检测模型** — 单个硬件定时器每 `SL_TIMER_PERIOD_US` 微秒溢出一次；其 ISR 扫描所有限位开关，
+以"连续稳定时间"模型去抖：电平一致则 `stable += SL_TIMER_PERIOD_US`，不一致则清零；
+`stable >= SL_STABLE_TIME_US` 即确认一次状态切换（`slot_limit.c:137-148`）。去抖与定时器周期
+解耦——ARR 与去抖步长都源自同一个宏 `SL_TIMER_PERIOD_US`。
 
-## Editing guidance
+**每个限位的状态机**（`SL_Machine_e`，`slot_limit.c:27`）：
 
-- Keep hardware fully abstracted: never add a direct `HAL_GPIO_ReadPin`/port reference outside `sl_read_pin`/`sl_is_active`; extend the config table pattern instead. `sl_read_pin` reads `GPIOx->IDR` directly (ISR-safe).
-- **No critical sections by design.** `sl_vars` is written only by the timer ISR; `SL_Open`/`SL_Close` only set `sl_cmd` bits (consumed by the ISR); `sl_trig_pending` is set by ISR and cleared by the task. All are single-bit pure writes or ISR-exclusive writes, so `taskENTER_CRITICAL` is intentionally absent. **Do not reintroduce critical sections** — and if you add a new shared variable, preserve the single-writer rule (ISR writes `sl_vars`, task writes nothing concurrent) rather than guarding with locks.
-- The TIM interrupt priority must stay at or below `configMAX_SYSCALL_INTERRUPT_PRIORITY` so `xTaskNotifyGiveFromISR` / `portYIELD_FROM_ISR` are legal. The host sets this in `FreeRTOSConfig.h`.
-- `SL_GetStatus` blocks (5ms delay); it is intentionally thread/task-only, not ISR-safe. Do not call it from an interrupt.
-- `SL_COUNT` and `SL_Id_e` are host-owned; the library only references them via the config and `sl_hw_table`. Don't hardcode limit counts in the library.
-- `SL_TIMER_PERIOD_US` is the single source of truth for scan frequency: it sets both ARR and the debounce step. If the host changes PSC/ARR, they must keep this macro in sync with the real overflow period, or debounce timing silently drifts.
-- Changes to stack/priority/timer defaults belong in `slot_limit.h`'s default-macro block, overridable from `slot_limit_config.h`.
+```
+CLOSE → OPEN（等待 idle）→ WAIT_TRIGGER（等待 active）→ CLOSE + 触发已上报
+```
+
+**并发模型 — 无临界区**（`slot_limit.c:11-16`，关键设计决策）：
+- `sl_vars`（`stable`、`machine`）的**唯一写者是定时器 ISR**。
+- `SL_Open`/`SL_Close` 从不触碰 `sl_vars`；它们只置位单 bit 的 `sl_cmd` 命令标志，由 ISR 在
+  下一轮扫描时消费并应用。
+- `sl_trig_pending` 由 ISR 置位、由任务清零。
+
+以上字段均为单 bit 纯写 / 单写者字段，在 F407 上无需 `taskENTER_CRITICAL` 即安全。
+**切勿为这些字段引入第二个写者**，除非重新加回临界区——整个设计都建立在单写者纪律之上。
+
+**触发路径** — ISR 确认触发 → 置位 `sl_trig_pending[id]` → `vTaskNotifyGiveFromISR` →
+`sl_task_entry` 被唤醒并调用 `SL_TriggerExecute(id)`。回调运行在任务上下文，绝不在 ISR 中。
+
+**配置抽象** — 库中零直接硬件引用。GPIO 来自 `sl_hw_table[]`（宿主定义的
+`SL_HwConfig_t`：端口/引脚/触发电平）；定时器来自 `SL_TIM_HANDLE` 宏。读取直接使用
+`port->IDR`，以保证 ISR 安全。
+
+**弱回调** — `SL_TriggerExecute` 与 `SL_OpenCustomInit` 均为 `__weak`（`slot_limit.c:260`），
+宿主无需额外配置标志即可覆盖。
+
+## API 说明
+
+- `SL_GetStatus(id)` 阻塞 5 ms（`vTaskDelay`）做两次采样去抖读取；若在 ISR 中调用或 id 越界
+  则返回 `SL_STATE_INVALID`。需要原始 GPIO 读取时用 `SL_GetStateNoDelay(id)`。
+- `SL_OpenCustomInit(id)` 返回 1 表示反转开合时的初始状态逻辑（例如半圆形挡片需要先寻找
+  idle 边沿）。
+- `slot_limit.c` include 了 CubeMX 生成的 `main.h` 与 `tim.h` —— 它假定宿主项目的生成目录结构。
+
+## 许可证
+
+MIT（见 `LICENSE`）。
