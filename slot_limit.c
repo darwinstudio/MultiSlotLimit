@@ -240,19 +240,14 @@ void SL_Init(void) {
     sl_handle =
         xTaskCreateStatic(sl_task_entry, "slot_limit", SL_TASK_STACK_SIZE, NULL, SL_TASK_PRIORITY, sl_stack, &sl_tcb);
     if (sl_handle == NULL) {
-#ifdef SL_USE_EASYLOGGER
-        log_e("The limit detection task create fail!");
-#endif
-        return; /* 任务创建失败（静态内存不足），不启动定时器，避免 ISR 通知空句柄 */
+        return; /* 任务创建失败（静态内存不足），不启动定时器，避免 ISR 通知空句柄
+                 */
     }
 
     /* 配置并启动扫描定时器：ARR = SL_TIMER_PERIOD_US（PSC 由 CubeMX 配好） */
     __HAL_TIM_SET_AUTORELOAD(&SL_TIM_HANDLE, (uint16_t) SL_TIMER_PERIOD_US);
     HAL_TIM_RegisterCallback(&SL_TIM_HANDLE, HAL_TIM_PERIOD_ELAPSED_CB_ID, SL_TimerCallback);
     HAL_TIM_Base_Start_IT(&SL_TIM_HANDLE);
-#ifdef SL_USE_EASYLOGGER
-    log_i("The limit detection task has been initiated.");
-#endif
 }
 
 /* ========== __weak 回调默认实现 ========== */
