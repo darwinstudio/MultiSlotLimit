@@ -21,8 +21,8 @@
 #include "task.h"
 #include "tim.h"
 #ifdef SL_USE_EASYLOGGER
-#include "elog.h"
 #define LOG_TAG "slot_limit"
+#include "elog.h"
 #endif
 
 /** @brief 内部状态机 */
